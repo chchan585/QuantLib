@@ -268,6 +268,8 @@ endif()
 if (QL_BUILD_TEST_SUITE OR QL_BUILD_BENCHMARK)
     add_subdirectory(test-suite)
 endif()
+add_subdirectory(my_src)
+
 
 # CPack support (make package, make package_source)
 set(CPACK_PACKAGE_VERSION_MAJOR ${QUANTLIB_VERSION_MAJOR})

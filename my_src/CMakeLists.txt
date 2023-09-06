@@ -1,0 +1,5 @@
+add_executable(myCDS myCDS.cpp)
+target_link_libraries(myCDS ql_library ${QL_THREAD_LIBRARIES})
+if (QL_INSTALL_EXAMPLES)
+    install(TARGETS CDS RUNTIME DESTINATION ${QL_INSTALL_EXAMPLESDIR})
+endif()
