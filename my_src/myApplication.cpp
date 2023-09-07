@@ -608,34 +608,34 @@ int main(int argc, char *argv[]) {
 
     std::cout << "yoyoyoyoyo" << std::endl;
 
-    try {
-        Size example = 0;
-        if (argc == 2)
-            example = std::atoi(argv[1]);
+    // try {
+    //     Size example = 0;
+    //     if (argc == 2)
+    //         example = std::atoi(argv[1]);
 
-        if (example == 0 || example == 1) {
-            std::cout << "***** Running example #1 *****" << std::endl;
-            example01();
-        }
+    //     if (example == 0 || example == 1) {
+    //         std::cout << "***** Running example #1 *****" << std::endl;
+    //         example01();
+    //     }
 
-        if (example == 0 || example == 2) {
-            std::cout << "***** Running example #2 *****" << std::endl;
-            example02();
-        }
+    //     if (example == 0 || example == 2) {
+    //         std::cout << "***** Running example #2 *****" << std::endl;
+    //         example02();
+    //     }
 
-        if (example == 0 || example == 3) {
-            std::cout << "***** Running example #3 *****" << std::endl;
-            example03();
-        }
+    //     if (example == 0 || example == 3) {
+    //         std::cout << "***** Running example #3 *****" << std::endl;
+    //         example03();
+    //     }
 
-        return 0;
-    }
-    catch (exception &e) {
-        cerr << e.what() << endl;
-        return 1;
-    }
-    catch (...) {
-        cerr << "unknown error" << endl;
-        return 1;
-    }
+    //     return 0;
+    // }
+    // catch (exception &e) {
+    //     cerr << e.what() << endl;
+    //     return 1;
+    // }
+    // catch (...) {
+    //     cerr << "unknown error" << endl;
+    //     return 1;
+    // }
 }
