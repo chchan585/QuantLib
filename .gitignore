@@ -110,7 +110,7 @@ test-suite/.unit_test_profile.txt
 
 # IDEs
 .vs
-.vscode
+
 .idea
 cmake-build-*
 nbproject
