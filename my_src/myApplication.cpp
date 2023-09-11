@@ -92,17 +92,27 @@ namespace my_application_cdo_test {
         using namespace my_application_cdo_test;
 
 #pragma region parameters
-        Size poolSize = 100;
-        Real lambda = 0.01;
+        Size poolSize = 100; // number of entities in the basket
 
+        Real lambda = 0.01; // hazard rate, i.e. the instantaneous risk of default at a given time
+                            // t, given that no default has occurred up until that time
+
+        // [model param]
         // nBuckets and period determine the computation time
         Size nBuckets = 200;
+
+        // [model param]
         // Period period = 1*Months;
         // for MC engines
         Size numSims = 5000;
 
+        // [for construction of the risk free yield term structure]
         Real rate = 0.05;
+
+        // [for construction of the risk free yield term structure]
         DayCounter daycount = Actual360();
+
+        // [for construction of the risk free yield term structure]
         Compounding cmp = Continuous; // Simple;
 
         Real recovery = 0.4;
@@ -120,11 +130,13 @@ namespace my_application_cdo_test {
 
         Settings::instance().evaluationDate() = asofDate;
 
-        ext::shared_ptr<YieldTermStructure> yieldPtr(
-            new FlatForward(asofDate, rate, daycount, cmp));
+        //  risk-free rate term structure
+        ext::shared_ptr<YieldTermStructure> yieldPtr(new FlatForward(asofDate, rate, daycount, cmp));
         Handle<YieldTermStructure> yieldHandle(yieldPtr);
 
+        // hazard rate
         Handle<Quote> hazardRate(ext::shared_ptr<Quote>(new SimpleQuote(lambda)));
+
         std::vector<Handle<DefaultProbabilityTermStructure>> basket;
         ext::shared_ptr<DefaultProbabilityTermStructure> ptr(
             new FlatHazardRate(asofDate, hazardRate, ActualActual(ActualActual::ISDA)));
