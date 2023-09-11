@@ -151,41 +151,53 @@ namespace my_application_cdo_test {
         // hazard rate
         Handle<Quote> hazardRate(ext::shared_ptr<Quote>(new SimpleQuote(lambda)));
 
+        // basket
         std::vector<Handle<DefaultProbabilityTermStructure>> basket;
-        ext::shared_ptr<DefaultProbabilityTermStructure> ptr(
+
+        ext::shared_ptr<DefaultProbabilityTermStructure> prob_term(
             new FlatHazardRate(asofDate, hazardRate, ActualActual(ActualActual::ISDA)));
+
         ext::shared_ptr<Pool> pool(new Pool());
+
         std::vector<std::string> names;
+
         // probability key items
         std::vector<Issuer> issuers;
         std::vector<std::pair<DefaultProbKey, Handle<DefaultProbabilityTermStructure>>> probabilities;
         probabilities.emplace_back(
                                     NorthAmericaCorpDefaultKey(EURCurrency(), SeniorSec, Period(0, Weeks), 10.),
-                                    Handle<DefaultProbabilityTermStructure>(ptr)
+                                    Handle<DefaultProbabilityTermStructure>(prob_term)
                                 );
 
         for (Size i = 0; i < poolSize; ++i) {
+            
+            // construct the name of the reference entity and push it into the vector
             std::ostringstream o;
             o << "issuer-" << i;
             names.push_back(o.str());
-            basket.emplace_back(ptr);
+
+            // add the probability term structure to the basket
+            basket.emplace_back(prob_term);
+
+            // add the probability key items to the vector
             issuers.emplace_back(probabilities);
-            pool->add(names.back(), issuers.back(),
-                      NorthAmericaCorpDefaultKey(EURCurrency(), QuantLib::SeniorSec, Period(), 1.));
+
+            // add the reference entities to the pool
+            pool->add(
+                        names.back(), 
+                        issuers.back(),
+                        NorthAmericaCorpDefaultKey(EURCurrency(), QuantLib::SeniorSec, Period(), 1.)
+                    );
         }
 
         ext::shared_ptr<SimpleQuote> correlation(new SimpleQuote(0.0));
         Handle<Quote> hCorrelation(correlation);
-        // QL_REQUIRE(LENGTH(hwAttachment) == LENGTH(hwDetachment), "data length does not match");
 
         ext::shared_ptr<PricingEngine> midPCDOEngine(new MidPointCDOEngine(yieldHandle));
         ext::shared_ptr<PricingEngine> integralCDOEngine(new IntegralCDOEngine(yieldHandle));
 
         const Size i = dataSet;
         correlation->setValue(hwData7[i].correlation);
-        // QL_REQUIRE(LENGTH(hwAttachment) == LENGTH(hwData7[i].trancheSpread),
-        //            "data length does not match");
-
 
 // define the models to be tested
 // update the tolerance values based on the models
@@ -194,6 +206,16 @@ namespace my_application_cdo_test {
         std::vector<std::string> modelNames;
         std::vector<Real> relativeToleranceMidp, relativeTolerancePeriod, absoluteTolerance;
 
+
+        // safety check: if nm or nm are smaller than -1, then the model is not defined
+        // return directly
+
+        if (hwData7[i].nm < -1 || hwData7[i].nz < -1) {
+            return;
+        } 
+
+
+        // choose distribution base on nm and nz
         if (hwData7[i].nm == -1 && hwData7[i].nz == -1) {
             ext::shared_ptr<GaussianConstantLossLM> gaussKtLossLM(
                 new GaussianConstantLossLM(hCorrelation, std::vector<Real>(poolSize, recovery),
@@ -232,109 +254,60 @@ namespace my_application_cdo_test {
             // Binomial...
             // Saddle point...
             // Recursive ...
-        } else if (hwData7[i].nm > 0 && hwData7[i].nz > 0) {
+        } 
+        else // either one is -1 and the other one is > 0, or bot are > 0
+        {
             TCopulaPolicy::initTraits initTG;
-            initTG.tOrders.push_back(hwData7[i].nm);
-            initTG.tOrders.push_back(hwData7[i].nz);
+            initTG.tOrders.push_back(hwData7[i].nm > 0 ? hwData7[i].nm : 45); // freedom degrees. if nm is -1, then use 45 as the freedom degree which is close to gaussian
+            initTG.tOrders.push_back(hwData7[i].nz > 0 ? hwData7[i].nz : 45); // freedom degrees. if nz is -1, then use 45 as the freedom degree which is close to gaussian
+
             ext::shared_ptr<TConstantLossLM> TKtLossLM(new TConstantLossLM(
                 hCorrelation, std::vector<Real>(poolSize, recovery),
                 LatentModelIntegrationType::GaussianQuadrature, poolSize, initTG));
-            // 1.-inhomogeneous studentT
-            modelNames.emplace_back("Inhomogeneous student");
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new IHStudentPoolLossModel(TKtLossLM, nBuckets, 5., -5., 15)));
-            absoluteTolerance.push_back(1.);
-            relativeToleranceMidp.push_back(0.04);
-            relativeTolerancePeriod.push_back(0.04);
-            // 2.-homogeneous student T
-            modelNames.emplace_back("Homogeneous student");
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new HomogTPoolLossModel(TKtLossLM, nBuckets, 5., -5., 15)));
-            absoluteTolerance.push_back(1.);
-            relativeToleranceMidp.push_back(0.04);
-            relativeTolerancePeriod.push_back(0.04);
-            // 3.-random default student T
-            modelNames.emplace_back("Random default studentT");
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new RandomDefaultLM<TCopulaPolicy>(TKtLossLM, numSims)));
-            absoluteTolerance.push_back(1.);
-            relativeToleranceMidp.push_back(0.07);
-            relativeTolerancePeriod.push_back(0.07);
-            // SECOND MC
-            // Binomial...
-            // Saddle point...
-            // Recursive ...
-        } else if (hwData7[i].nm > 0 && hwData7[i].nz == -1) {
-            TCopulaPolicy::initTraits initTG;
-            initTG.tOrders.push_back(hwData7[i].nm);
-            initTG.tOrders.push_back(45);
-            /* T_{55} is pretty close to a gaussian. Probably theres no need to
-            be this conservative as the polynomial convolution gets shorter and
-            faster as the order decreases.
-            */
-            ext::shared_ptr<TConstantLossLM> TKtLossLM(new TConstantLossLM(
-                hCorrelation, std::vector<Real>(poolSize, recovery),
-                LatentModelIntegrationType::GaussianQuadrature, poolSize, initTG));
+
             // 1.-inhomogeneous
-            modelNames.emplace_back("Inhomogeneous student-gaussian");
+            modelNames.emplace_back(
+                                    "Inhomogeneous " + 
+                                    std::string(hwData7[i].nm > 0 ? "student" : "gaussian") + 
+                                    std::string("-") + 
+                                    std::string(hwData7[i].nz > 0 ? "student" : "gaussian")
+                                    );
+
             basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
                 new IHStudentPoolLossModel(TKtLossLM, nBuckets, 5., -5., 15)));
             absoluteTolerance.push_back(1.);
             relativeToleranceMidp.push_back(0.04);
             relativeTolerancePeriod.push_back(0.04);
+
             // 2.-homogeneous
-            modelNames.emplace_back("Homogeneous student-gaussian");
+            modelNames.emplace_back(
+                                    "Homogeneous " + 
+                                    std::string(hwData7[i].nm > 0 ? "student" : "gaussian") + 
+                                    std::string("-") + 
+                                    std::string(hwData7[i].nz > 0 ? "student" : "gaussian")
+                                    );
+
             basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
                 new HomogTPoolLossModel(TKtLossLM, nBuckets, 5., -5., 15)));
             absoluteTolerance.push_back(1.);
             relativeToleranceMidp.push_back(0.04);
             relativeTolerancePeriod.push_back(0.04);
+
             // 3.-random default
-            modelNames.emplace_back("Random default student-gaussian");
+            modelNames.emplace_back(
+                                    "Random default " + 
+                                    std::string(hwData7[i].nm > 0 ? "student" : "gaussian") + 
+                                    std::string("-") + 
+                                    std::string(hwData7[i].nz > 0 ? "student" : "gaussian")
+                                    );
+
             basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
                 new RandomDefaultLM<TCopulaPolicy>(TKtLossLM, numSims)));
             absoluteTolerance.push_back(1.);
             relativeToleranceMidp.push_back(0.07);
             relativeTolerancePeriod.push_back(0.07);
-            // SECOND MC
-            // Binomial...
-            // Saddle point...
-            // Recursive ...
-        } else if (hwData7[i].nm == -1 && hwData7[i].nz > 0) {
-            TCopulaPolicy::initTraits initTG;
-            initTG.tOrders.push_back(45); // pretty close to gaussian
-            initTG.tOrders.push_back(hwData7[i].nz);
-            ext::shared_ptr<TConstantLossLM> TKtLossLM(new TConstantLossLM(
-                hCorrelation, std::vector<Real>(poolSize, recovery),
-                LatentModelIntegrationType::GaussianQuadrature, poolSize, initTG));
-            // 1.-inhomogeneous gaussian
-            modelNames.emplace_back("Inhomogeneous gaussian-student");
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new IHStudentPoolLossModel(TKtLossLM, nBuckets, 5., -5., 15)));
-            absoluteTolerance.push_back(1.);
-            relativeToleranceMidp.push_back(0.04);
-            relativeTolerancePeriod.push_back(0.04);
-            // 2.-homogeneous gaussian
-            modelNames.emplace_back("Homogeneous gaussian-student");
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new HomogTPoolLossModel(TKtLossLM, nBuckets, 5., -5., 15)));
-            absoluteTolerance.push_back(1.);
-            relativeToleranceMidp.push_back(0.04);
-            relativeTolerancePeriod.push_back(0.04);
-            // 3.-random default gaussian
-            modelNames.emplace_back("Random default gaussian-student");
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new RandomDefaultLM<TCopulaPolicy>(TKtLossLM, numSims)));
-            absoluteTolerance.push_back(1.);
-            relativeToleranceMidp.push_back(0.07);
-            relativeTolerancePeriod.push_back(0.07);
-            // SECOND MC
-            // Binomial...
-            // Saddle point...
-            // Recursive ...
-        } else {
-            return;
         }
+
 #pragma endregion
 
         // start the valuation for each tranche
