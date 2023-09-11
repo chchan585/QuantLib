@@ -55,21 +55,6 @@ namespace my_application_cdo_test {
     };
 
 
-
-    struct tranches {
-        Real attachment;
-        Real detachment;
-    };
-
-
-    // 4 tranches
-    // 1st tranche: 0-3%
-    // 2nd tranche: 3-6%
-    // 3rd tranche: 6-10%
-    // 4th tranche: 10-100%
-    //tranches hwTranches[] = {{0.00, 0.03}, {0.03, 0.06}, {0.06, 0.10}, {0.10, 1.00}};
-    vector <tranches> hwTranches = {{0.00, 0.03}, {0.03, 0.06}, {0.06, 0.10}, {0.10, 1.00}};
-
     // HW Table 7
     // corr, Nm, Nz, 0-3, 3-6, 6-10, 10-100
     hwDatum hwData7[] = {{0.1, -1, -1, {2279, 450, 89, 1}},
@@ -85,6 +70,22 @@ namespace my_application_cdo_test {
                          {0.3, 5, -1, {1444, 408, 171, 10}},
                          {0.3, 5, 5, {1713, 359, 136, 9}}};
 
+
+    struct tranches {
+        Real attachment;
+        Real detachment;
+    };
+
+
+    // 4 tranches
+    // 1st tranche: 0-3%
+    // 2nd tranche: 3-6%
+    // 3rd tranche: 6-10%
+    // 4th tranche: 10-100%
+    // tranches hwTranches[] = {{0.00, 0.03}, {0.03, 0.06}, {0.06, 0.10}, {0.10, 1.00}};
+    vector<tranches> hwTranches = {{0.00, 0.03}, {0.03, 0.06}, {0.06, 0.10}, {0.10, 1.00}};
+
+
     void check(int i,
                int j,
                const std::string& desc,
@@ -92,10 +93,7 @@ namespace my_application_cdo_test {
                Real expected,
                Real bpTolerance,
                Real relativeTolerance) {
-        /* Uncomment to display the full show if your debugging:
-        std::cout<< "Case: "<< i << " " << j << " " << found << " :: "
-            << expected  <<  " ("<< desc << ") " << std::endl;
-        */
+
         Real absDiff = found - expected;
         Real relDiff = absDiff / expected;
         cout << "case " << i << " " << j << " (" << desc << "): " << found << " vs. " << expected << endl;
