@@ -26,14 +26,32 @@ using namespace QuantLib;
 
 namespace my_application_cdo_test {
 
+    // 4 tranches
+    // 1st tranche: 0-3%
+    // 2nd tranche: 3-6%
+    // 3rd tranche: 6-10%
+    // 4th tranche: 10-100%
+    // nth tranche: [hwAttachment[n-1], hwDetachment[n-1]]
     Real hwAttachment[] = {0.00, 0.03, 0.06, 0.10};
     Real hwDetachment[] = {0.03, 0.06, 0.10, 1.00};
 
+
+
     struct hwDatum {
-        Real correlation;
-        Integer nm;
-        Integer nz;
-        Real trancheSpread[4];
+        Real correlation; // correlation between the defaults of the reference entities in the
+                          // Synthetic CDO. i.e. the likelihood that the entities will default on
+                          // their debt obligations at the same time. Note that this is under
+                          // "single-factor model", assumed that the default of each entity is
+                          // driven by a single common factor, along with an idiosyncratic
+                          // (entity-specific) factor.
+
+        Integer
+            nm; // degrees of freedom parameter for a Student's t-distribution in a t-copula model. if -1, then gaussian
+        Integer
+            nz; // degrees of freedom parameter for a Student's t-distribution in a t-copula model. if -1, then gaussian
+
+        Real trancheSpread[4]; // expected tranche spreads for the 4 tranches. used in the test
+                               // cases to compare the results of the pricing engines.
     };
 
     // HW Table 7
@@ -64,13 +82,16 @@ namespace my_application_cdo_test {
         */
         Real absDiff = found - expected;
         Real relDiff = absDiff / expected;
-        cout << "case " << i << " " << j << " (" << desc << "): " << found << " vs. " << expected;
+        cout << "case " << i << " " << j << " (" << desc << "): " << found << " vs. " << expected << endl;
     }
 
 
     void runTest(unsigned dataSet) {
-        cout << "Testing CDO premiums against Hull-White values for data set " << dataSet << "...";
+        cout << endl;
+        cout << "Testing CDO premiums against Hull-White values for data set " << dataSet << "..." << endl;
         using namespace my_application_cdo_test;
+
+#pragma region parameters
         Size poolSize = 100;
         Real lambda = 0.01;
 
@@ -95,6 +116,7 @@ namespace my_application_cdo_test {
                                 .withCalendar(TARGET());
 
         Date asofDate = Date(31, August, 2006);
+#pragma endregion
 
         Settings::instance().evaluationDate() = asofDate;
 
@@ -137,6 +159,11 @@ namespace my_application_cdo_test {
         correlation->setValue(hwData7[i].correlation);
         // QL_REQUIRE(LENGTH(hwAttachment) == LENGTH(hwData7[i].trancheSpread),
         //            "data length does not match");
+
+
+// define the models to be tested
+// update the tolerance values based on the models
+#pragma region Models
         std::vector<ext::shared_ptr<DefaultLossModel>> basketModels;
         std::vector<std::string> modelNames;
         std::vector<Real> relativeToleranceMidp, relativeTolerancePeriod, absoluteTolerance;
@@ -282,30 +309,89 @@ namespace my_application_cdo_test {
         } else {
             return;
         }
+#pragma endregion
 
+        // start the valuation for each tranche
         for (Size j = 0; j < LENGTH(hwAttachment); j++) {
-            ext::shared_ptr<Basket> basketPtr(
-                new Basket(asofDate, names, nominals, pool, hwAttachment[j], hwDetachment[j]));
+
+            ext::shared_ptr<Basket> basketPtr(new Basket(
+                asofDate, // as of date, date, reference date for the basket. It could represent the
+                          // date on which the basket was created or the date from which the credit
+                          // risk of the entities in the basket is being measured.
+
+                names, // names, list of strings, the names of the reference entities
+
+
+                nominals, // nominals, list of real numbers, the notional amounts associated with
+                          // each reference entity. The notional amount is the hypothetical amount
+                          // of debt upon which the credit derivative's payments are based. It
+                          // represents the face value of the debt associated with each reference
+                          // entity.
+
+                pool, // pool, share ptr, collection of reference entities such as corporate bonds
+                      // or loans that the CDO is based on
+
+                hwAttachment[j], // attachment point, real number, the
+                                 // threshold of losses that must be reached before the
+                                 // protection seller (or the investors in the case of a
+                                 // Synthetic CDO) starts to suffer losses.
+
+                hwDetachment[j] // detachment point, real number, the threshold of losses that must
+                                // be reached before the protection seller (or the investors in the
+                                // case of a Synthetic CDO) starts to suffer losses.
+                ));
+
             std::ostringstream trancheId;
-            trancheId << "[" << hwAttachment[j] << " , " << hwDetachment[j] << "]";
-            SyntheticCDO cdoe(basketPtr, Protection::Seller, schedule, 0.0, premium, daycount,
-                              Following);
+
+            trancheId << "Tranche #" << j+1 << " "<< "[" << hwAttachment[j] << " - " << hwDetachment[j] << "]";
+
+            SyntheticCDO cdoe(
+                basketPtr, // basket, share ptr, collection of reference entities such as corporate bonds or
+                           // loans that the CDO is based on
+
+                Protection::Seller, // protection side, enum, the side of the credit default swap (CDS)
+                                    // that the protection seller is on
+
+                schedule,           // schedule, object, the schedule of payment dates for the CDO
+
+                0.0,     // upfront payment rate, real number, a percentage of the notional amount that the
+                         // protection buyer pays the protection seller at the start of the contract
+                
+                premium, // regular payment rate, real number, a percentage of the notional amount that the
+                         // protection buyer pays to the protection seller on each payment date in
+                         // the schedule
+                
+                daycount, // day counter,  used for calculating the time between dates
+                
+                Following // payment convention, convention for adjusting payment dates if they fall
+                          // on a non-business day
+            );
 
             for (Size im = 0; im < basketModels.size(); im++) {
 
                 basketPtr->setLossModel(basketModels[im]);
 
                 cdoe.setPricingEngine(midPCDOEngine);
-                check(i, j,
-                      modelNames[im] + std::string(" with midp integration on ") + trancheId.str(),
-                      cdoe.fairPremium() * 1e4, hwData7[i].trancheSpread[j], absoluteTolerance[im],
-                      relativeToleranceMidp[im]);
+                check(
+                        i, // data set
+                        j, // tranche
+                        modelNames[im] + std::string(" with midp integration on ") + trancheId.str(), // description
+                        cdoe.fairPremium() * 1e4, // found 
+                        hwData7[i].trancheSpread[j], // expected
+                        absoluteTolerance[im], // absolute tolerance
+                        relativeToleranceMidp[im] // relative tolerance
+                    );
 
                 cdoe.setPricingEngine(integralCDOEngine);
-                check(i, j,
-                      modelNames[im] + std::string(" with step integration on ") + trancheId.str(),
-                      cdoe.fairPremium() * 1e4, hwData7[i].trancheSpread[j], absoluteTolerance[im],
-                      relativeTolerancePeriod[im]);
+                check(
+                        i, // data set
+                        j, // tranche
+                        modelNames[im] + std::string(" with step integration on ") + trancheId.str(), // description
+                        cdoe.fairPremium() * 1e4, // found
+                        hwData7[i].trancheSpread[j], // expected
+                        absoluteTolerance[im], // absolute tolerance
+                        relativeTolerancePeriod[im] // relative tolerance
+                    );
             }
         }
     }
