@@ -32,8 +32,8 @@ namespace my_application_cdo_test {
     // 3rd tranche: 6-10%
     // 4th tranche: 10-100%
     // nth tranche: [hwAttachment[n-1], hwDetachment[n-1]]
-    Real hwAttachment[] = {0.00, 0.03, 0.06, 0.10};
-    Real hwDetachment[] = {0.03, 0.06, 0.10, 1.00};
+    // Real hwAttachment[] = {0.00, 0.03, 0.06, 0.10};
+    // Real hwDetachment[] = {0.03, 0.06, 0.10, 1.00};
 
 
 
@@ -53,6 +53,22 @@ namespace my_application_cdo_test {
         Real trancheSpread[4]; // expected tranche spreads for the 4 tranches. used in the test
                                // cases to compare the results of the pricing engines.
     };
+
+
+
+    struct tranches {
+        Real attachment;
+        Real detachment;
+    };
+
+
+    // 4 tranches
+    // 1st tranche: 0-3%
+    // 2nd tranche: 3-6%
+    // 3rd tranche: 6-10%
+    // 4th tranche: 10-100%
+    //tranches hwTranches[] = {{0.00, 0.03}, {0.03, 0.06}, {0.06, 0.10}, {0.10, 1.00}};
+    vector <tranches> hwTranches = {{0.00, 0.03}, {0.03, 0.06}, {0.06, 0.10}, {0.10, 1.00}};
 
     // HW Table 7
     // corr, Nm, Nz, 0-3, 3-6, 6-10, 10-100
@@ -324,7 +340,7 @@ namespace my_application_cdo_test {
 #pragma endregion
 
         // start the valuation for each tranche
-        for (Size j = 0; j < LENGTH(hwAttachment); j++) {
+        for (Size j = 0; j < hwTranches.size(); j++) {
 
             ext::shared_ptr<Basket> basketPtr(new Basket(
                 asofDate, // as of date, date, reference date for the basket. It could represent the
@@ -343,19 +359,20 @@ namespace my_application_cdo_test {
                 pool, // pool, share ptr, collection of reference entities such as corporate bonds
                       // or loans that the CDO is based on
 
-                hwAttachment[j], // attachment point, real number, the
-                                 // threshold of losses that must be reached before the
-                                 // protection seller (or the investors in the case of a
-                                 // Synthetic CDO) starts to suffer losses.
+                hwTranches[j].attachment, // attachment point, real number, the
+                                          // threshold of losses that must be reached before the
+                                          // protection seller (or the investors in the case of a
+                                          // Synthetic CDO) starts to suffer losses.
 
-                hwDetachment[j] // detachment point, real number, the threshold of losses that must
-                                // be reached before the protection seller (or the investors in the
-                                // case of a Synthetic CDO) starts to suffer losses.
-                ));
+                hwTranches[j].detachment    // detachment point, real number, the threshold of losses that must
+                                            // be reached before the protection seller (or the investors in the
+                                            // case of a Synthetic CDO) starts to suffer losses.
+            ));
 
             std::ostringstream trancheId;
 
-            trancheId << "Tranche #" << j+1 << " "<< "[" << hwAttachment[j] << " - " << hwDetachment[j] << "]";
+            trancheId << "Tranche #" << j + 1 << " "
+                      << "[" << hwTranches[j].attachment << " - " << hwTranches[j].detachment << "]";
 
             SyntheticCDO cdoe(
                 basketPtr, // basket, share ptr, collection of reference entities such as corporate bonds or
