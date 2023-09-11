@@ -144,11 +144,11 @@ namespace my_application_cdo_test {
         std::vector<std::string> names;
         // probability key items
         std::vector<Issuer> issuers;
-        std::vector<std::pair<DefaultProbKey, Handle<DefaultProbabilityTermStructure>>>
-            probabilities;
+        std::vector<std::pair<DefaultProbKey, Handle<DefaultProbabilityTermStructure>>> probabilities;
         probabilities.emplace_back(
-            NorthAmericaCorpDefaultKey(EURCurrency(), SeniorSec, Period(0, Weeks), 10.),
-            Handle<DefaultProbabilityTermStructure>(ptr));
+                                    NorthAmericaCorpDefaultKey(EURCurrency(), SeniorSec, Period(0, Weeks), 10.),
+                                    Handle<DefaultProbabilityTermStructure>(ptr)
+                                );
 
         for (Size i = 0; i < poolSize; ++i) {
             std::ostringstream o;
