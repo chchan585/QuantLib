@@ -330,13 +330,13 @@ void CdoTest::testHW(unsigned dataSet) {
     else {
         return;
     }
-
+    
     for (Size j = 0; j < LENGTH(hwAttachment); j ++) {
         ext::shared_ptr<Basket> basketPtr (
             new Basket(asofDate, names, nominals, pool,
                 hwAttachment[j], hwDetachment[j]));
         std::ostringstream trancheId;
-        trancheId << "[" << hwAttachment[j] << " , " << hwDetachment[j]
+        trancheId << "[" << hwAttachment[j] << " ,  " << hwDetachment[j]
             << "]";
         SyntheticCDO cdoe(basketPtr, Protection::Seller,
                           schedule, 0.0, premium, daycount, Following);
