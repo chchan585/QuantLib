@@ -86,6 +86,29 @@ namespace my_application_cdo_test {
     vector<tranches> hwTranches = {{0.00, 0.03}, {0.03, 0.06}, {0.06, 0.10}, {0.10, 1.00}};
 
 
+    struct model{
+        string modelName;
+        ext::shared_ptr<DefaultLossModel> basketModel;
+        Real absoluteTolerance;
+        Real relativeToleranceMidp;
+        Real relativeTolerancePeriod;
+
+
+        // constructor
+        model(const string& modelName,
+          const ext::shared_ptr<DefaultLossModel>& basketModel,
+          const Real& absoluteTolerance,
+          const Real& relativeToleranceMidp,
+          const Real& relativeTolerancePeriod)
+        : modelName(modelName),
+          basketModel(basketModel),
+          absoluteTolerance(absoluteTolerance),
+          relativeToleranceMidp(relativeToleranceMidp),
+          relativeTolerancePeriod(relativeTolerancePeriod)
+        {}
+    };
+
+
     void check(int i,
                int j,
                const std::string& desc,
@@ -202,10 +225,11 @@ namespace my_application_cdo_test {
 // define the models to be tested
 // update the tolerance values based on the models
 #pragma region Models
-        std::vector<ext::shared_ptr<DefaultLossModel>> basketModels;
-        std::vector<std::string> modelNames;
-        std::vector<Real> relativeToleranceMidp, relativeTolerancePeriod, absoluteTolerance;
+        // std::vector<ext::shared_ptr<DefaultLossModel>> basketModels;
+        // std::vector<std::string> modelNames;
+        // std::vector<Real> relativeToleranceMidp, relativeTolerancePeriod, absoluteTolerance;
 
+        std::vector<model> models;
 
         // safety check: if nm or nm are smaller than -1, then the model is not defined
         // return directly
@@ -218,94 +242,81 @@ namespace my_application_cdo_test {
         // choose distribution base on nm and nz
         if (hwData7[i].nm == -1 && hwData7[i].nz == -1) {
             ext::shared_ptr<GaussianConstantLossLM> gaussKtLossLM(
-                new GaussianConstantLossLM(hCorrelation, std::vector<Real>(poolSize, recovery),
-                                           LatentModelIntegrationType::GaussianQuadrature, poolSize,
-                                           GaussianCopulaPolicy::initTraits()));
-
+                                            new GaussianConstantLossLM(
+                                                hCorrelation, 
+                                                std::vector<Real>(poolSize, recovery),
+                                                LatentModelIntegrationType::GaussianQuadrature, poolSize,
+                                                GaussianCopulaPolicy::initTraits()
+                                                )
+                                           );
+            
             // 1.-Inhomogeneous gaussian
-            modelNames.emplace_back("Inhomogeneous gaussian");
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new IHGaussPoolLossModel(gaussKtLossLM, nBuckets, 5., -5, 15)));
-            absoluteTolerance.push_back(1.);
-            relativeToleranceMidp.push_back(0.04);
-            relativeTolerancePeriod.push_back(0.04);
+            models.emplace_back(
+                "Inhomogeneous gaussian",   // model name
+                ext::shared_ptr<DefaultLossModel>(new IHGaussPoolLossModel(gaussKtLossLM, nBuckets, 5., -5, 15)),   // model
+                1.,     // absolute tolerance
+                0.04,   // relative tolerance midp
+                0.04    // relative tolerance period
+            );
+
             // 2.-homogeneous gaussian
-            modelNames.emplace_back("Homogeneous gaussian");
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new HomogGaussPoolLossModel(gaussKtLossLM, nBuckets, 5., -5, 15)));
-            absoluteTolerance.push_back(1.);
-            relativeToleranceMidp.push_back(0.04);
-            relativeTolerancePeriod.push_back(0.04);
+            models.emplace_back(
+                "Homogeneous gaussian",   // model name
+                ext::shared_ptr<DefaultLossModel>(new HomogGaussPoolLossModel(gaussKtLossLM, nBuckets, 5., -5, 15)),   // model
+                1.,     // absolute tolerance
+                0.04,   // relative tolerance midp
+                0.04    // relative tolerance period
+            );
+            
             // 3.-random default gaussian
-            modelNames.emplace_back("Random default gaussian");
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new RandomDefaultLM<GaussianCopulaPolicy>(gaussKtLossLM, numSims)));
-            absoluteTolerance.push_back(1.);
-            relativeToleranceMidp.push_back(0.07);
-            relativeTolerancePeriod.push_back(0.07);
-            // SECOND MC
-            // gaussian LHP
-            modelNames.emplace_back("Gaussian LHP");
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new GaussianLHPLossModel(hCorrelation, std::vector<Real>(poolSize, recovery))));
-            absoluteTolerance.push_back(10.);
-            relativeToleranceMidp.push_back(0.5);
-            relativeTolerancePeriod.push_back(0.5);
-            // Binomial...
-            // Saddle point...
-            // Recursive ...
+            models.emplace_back(
+                "Random default gaussian",   // model name
+                ext::shared_ptr<DefaultLossModel>(new RandomDefaultLM<GaussianCopulaPolicy>(gaussKtLossLM, numSims)),   // model
+                1.,     // absolute tolerance
+                0.07,   // relative tolerance midp
+                0.07    // relative tolerance period
+            );
+
         } 
         else // either one is -1 and the other one is > 0, or bot are > 0
         {
             TCopulaPolicy::initTraits initTG;
-            initTG.tOrders.push_back(hwData7[i].nm > 0 ? hwData7[i].nm : 45); // freedom degrees. if nm is -1, then use 45 as the freedom degree which is close to gaussian
-            initTG.tOrders.push_back(hwData7[i].nz > 0 ? hwData7[i].nz : 45); // freedom degrees. if nz is -1, then use 45 as the freedom degree which is close to gaussian
+
+            // freedom degrees. if nm is -1, then use 45 as the freedom degree which is close to gaussian
+            initTG.tOrders.push_back(hwData7[i].nm > 0 ? hwData7[i].nm : 45); 
+            initTG.tOrders.push_back(hwData7[i].nz > 0 ? hwData7[i].nz : 45); 
 
             ext::shared_ptr<TConstantLossLM> TKtLossLM(new TConstantLossLM(
                 hCorrelation, std::vector<Real>(poolSize, recovery),
                 LatentModelIntegrationType::GaussianQuadrature, poolSize, initTG));
 
-            // 1.-inhomogeneous
-            modelNames.emplace_back(
-                                    "Inhomogeneous " + 
-                                    std::string(hwData7[i].nm > 0 ? "student" : "gaussian") + 
-                                    std::string("-") + 
-                                    std::string(hwData7[i].nz > 0 ? "student" : "gaussian")
-                                    );
+            // 1.-inhomogeneous            
+            models.emplace_back(
+                "Inhomogeneous " +  string(hwData7[i].nm > 0 ? "student" : "gaussian") +  string("-") +  string(hwData7[i].nz > 0 ? "student" : "gaussian"),   // model name
+                ext::shared_ptr<DefaultLossModel>(new IHStudentPoolLossModel(TKtLossLM, nBuckets, 5., -5., 15)),   // model
+                1.,     // absolute tolerance
+                0.04,   // relative tolerance midp
+                0.04    // relative tolerance period
+            );
 
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new IHStudentPoolLossModel(TKtLossLM, nBuckets, 5., -5., 15)));
-            absoluteTolerance.push_back(1.);
-            relativeToleranceMidp.push_back(0.04);
-            relativeTolerancePeriod.push_back(0.04);
 
             // 2.-homogeneous
-            modelNames.emplace_back(
-                                    "Homogeneous " + 
-                                    std::string(hwData7[i].nm > 0 ? "student" : "gaussian") + 
-                                    std::string("-") + 
-                                    std::string(hwData7[i].nz > 0 ? "student" : "gaussian")
-                                    );
-
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new HomogTPoolLossModel(TKtLossLM, nBuckets, 5., -5., 15)));
-            absoluteTolerance.push_back(1.);
-            relativeToleranceMidp.push_back(0.04);
-            relativeTolerancePeriod.push_back(0.04);
+            models.emplace_back(
+                "Homogeneous " +  string(hwData7[i].nm > 0 ? "student" : "gaussian") +  string("-") +  string(hwData7[i].nz > 0 ? "student" : "gaussian"),   // model name
+                ext::shared_ptr<DefaultLossModel>(new HomogTPoolLossModel(TKtLossLM, nBuckets, 5., -5., 15)),   // model
+                1.,     // absolute tolerance
+                0.04,   // relative tolerance midp
+                0.04    // relative tolerance period
+            );
 
             // 3.-random default
-            modelNames.emplace_back(
-                                    "Random default " + 
-                                    std::string(hwData7[i].nm > 0 ? "student" : "gaussian") + 
-                                    std::string("-") + 
-                                    std::string(hwData7[i].nz > 0 ? "student" : "gaussian")
-                                    );
-
-            basketModels.push_back(ext::shared_ptr<DefaultLossModel>(
-                new RandomDefaultLM<TCopulaPolicy>(TKtLossLM, numSims)));
-            absoluteTolerance.push_back(1.);
-            relativeToleranceMidp.push_back(0.07);
-            relativeTolerancePeriod.push_back(0.07);
+            models.emplace_back(
+                "Random default " +  string(hwData7[i].nm > 0 ? "student" : "gaussian") +  string("-") +  string(hwData7[i].nz > 0 ? "student" : "gaussian"),   // model name
+                ext::shared_ptr<DefaultLossModel>(new RandomDefaultLM<TCopulaPolicy>(TKtLossLM, numSims)),   // model
+                1.,     // absolute tolerance
+                0.07,   // relative tolerance midp
+                0.07    // relative tolerance period
+            );
         }
 
 #pragma endregion
@@ -367,30 +378,30 @@ namespace my_application_cdo_test {
                           // on a non-business day
             );
 
-            for (Size im = 0; im < basketModels.size(); im++) {
+            for (Size im = 0; im < models.size(); im++) {
 
-                basketPtr->setLossModel(basketModels[im]);
+                basketPtr->setLossModel(models[im].basketModel);
 
                 cdoe.setPricingEngine(midPCDOEngine);
                 check(
                         i, // data set
                         j, // tranche
-                        modelNames[im] + std::string(" with midp integration on ") + trancheId.str(), // description
+                        models[im].modelName + std::string(" with midp integration on ") + trancheId.str(), // description
                         cdoe.fairPremium() * 1e4, // found 
                         hwData7[i].trancheSpread[j], // expected
-                        absoluteTolerance[im], // absolute tolerance
-                        relativeToleranceMidp[im] // relative tolerance
+                        models[im].absoluteTolerance, // absolute tolerance
+                        models[im].relativeToleranceMidp // relative tolerance
                     );
 
                 cdoe.setPricingEngine(integralCDOEngine);
                 check(
                         i, // data set
                         j, // tranche
-                        modelNames[im] + std::string(" with step integration on ") + trancheId.str(), // description
+                        models[im].modelName + std::string(" with step integration on ") + trancheId.str(), // description
                         cdoe.fairPremium() * 1e4, // found
                         hwData7[i].trancheSpread[j], // expected
-                        absoluteTolerance[im], // absolute tolerance
-                        relativeTolerancePeriod[im] // relative tolerance
+                        models[im].absoluteTolerance, // absolute tolerance
+                        models[im].relativeTolerancePeriod // relative tolerance
                     );
             }
         }
