@@ -139,8 +139,7 @@ namespace my_application_cdo_test {
         Size nBuckets = 200;
 
         // [model param]
-        // Period period = 1*Months;
-        // for MC engines
+        // used for random default model
         Size numSims = 5000;
 
         // [for construction of the risk free yield term structure]
